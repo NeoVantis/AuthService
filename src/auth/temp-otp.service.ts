@@ -27,8 +27,10 @@ export class TempOtpService {
     this.cleanupExpired();
 
     // In real implementation, this would call external OTP service
-    console.log(`📱 [TEMP OTP] Sending OTP ${code} to ${email} (ID: ${uniqueId})`);
-    
+    console.log(
+      `📱 [TEMP OTP] Sending OTP ${code} to ${email} (ID: ${uniqueId})`,
+    );
+
     return { uniqueId, code };
   }
 
@@ -69,9 +71,19 @@ export class TempOtpService {
   }
 
   // Debug endpoint to view active OTPs - remove in production
-  getActiveOtps(): Array<{ id: string; email: string; code: string; expiresAt: Date }> {
-    const result: Array<{ id: string; email: string; code: string; expiresAt: Date }> = [];
-    
+  getActiveOtps(): Array<{
+    id: string;
+    email: string;
+    code: string;
+    expiresAt: Date;
+  }> {
+    const result: Array<{
+      id: string;
+      email: string;
+      code: string;
+      expiresAt: Date;
+    }> = [];
+
     for (const [id, record] of this.otpStore.entries()) {
       if (record.expiresAt > new Date()) {
         result.push({
@@ -82,7 +94,7 @@ export class TempOtpService {
         });
       }
     }
-    
+
     return result;
   }
 }
