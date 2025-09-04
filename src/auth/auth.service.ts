@@ -46,6 +46,7 @@ export class AuthService {
    * @returns Promise containing userId and success message
    * @throws ConflictException if email or username already exists
    */
+
   async stepOneSignup(
     dto: StepOneSignupDto,
   ): Promise<{ userId: string; message: string }> {
@@ -122,6 +123,7 @@ export class AuthService {
    * @returns Promise containing access token and user profile
    * @throws UnauthorizedException if credentials invalid, registration incomplete, or account deactivated
    */
+
   async signin(
     dto: SigninDto,
   ): Promise<{ access_token: string; user: Partial<User> }> {
@@ -151,11 +153,13 @@ export class AuthService {
     return { access_token, user: userProfile as Partial<User> };
   }
 
+
   /**
    * Verifies if a JWT token is valid and returns user information
    * @param token - The JWT token to verify
    * @returns Promise containing validation result and user info if valid
    */
+
   async verifyToken(
     token: string,
   ): Promise<{ valid: boolean; user?: Partial<User> }> {
@@ -194,6 +198,7 @@ export class AuthService {
    * @returns Promise containing temporary code and success message
    * @note In production, OTP should be sent via email service
    */
+
   async forgotPassword(
     dto: ForgotPasswordDto,
   ): Promise<{ tempCode: string; message: string }> {
