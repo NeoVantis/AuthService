@@ -105,7 +105,7 @@ export class UsersService {
     }
 
     await this.repo.update(id, updateData);
-    return (await this.findById(id)) as User;
+    return await this.findById(id);
   }
 
   async softDelete(id: string): Promise<boolean> {
