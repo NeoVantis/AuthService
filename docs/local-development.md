@@ -27,7 +27,7 @@
 
 2. **Create the database**:
    ```bash
-   # Connect to PostgreSQL as your user
+   # Connect to PostgreSQL as your user (replace 'yourusername' with your actual username)
    psql postgres
    
    # Create the auth database
@@ -42,7 +42,8 @@
 
 3. **Test connection**:
    ```bash
-   psql postgresql://vaidityatanwar@localhost:5432/auth
+   # Replace 'yourusername' with your actual username
+   psql postgresql://yourusername@localhost:5432/auth
    ```
 
 ### Option 2: Using Docker (Alternative)
@@ -51,13 +52,13 @@
 # Run PostgreSQL in Docker
 docker run --name auth-postgres \
   -e POSTGRES_DB=auth \
-  -e POSTGRES_USER=vaidityatanwar \
+  -e POSTGRES_USER=yourusername \
   -e POSTGRES_HOST_AUTH_METHOD=trust \
   -p 5432:5432 \
   -d postgres:15
 
-# Test connection
-psql postgresql://vaidityatanwar@localhost:5432/auth
+# Test connection (replace 'yourusername' with your actual username)
+psql postgresql://yourusername@localhost:5432/auth
 ```
 
 ## Application Setup
@@ -88,44 +89,71 @@ psql postgresql://vaidityatanwar@localhost:5432/auth
 4. **Verify everything works**:
    ```bash
    # Test health endpoint (detailed)
-   curl http://localhost:3001/api/v1/health
+   curl http://localhost:3000/api/v1/health
    
    # Test simple health
-   curl http://localhost:3001/api/v1/health/simple
+   curl http://localhost:3000/api/v1/health/simple
    
-   # Test signup
-   curl -X POST http://localhost:3001/api/v1/auth/signup \
+   # Test two-step registration
+   # Step 1: Create account
+   curl -X POST http://localhost:3000/api/v1/auth/signup/step1 \
      -H "Content-Type: application/json" \
-     -d '{"email":"test@example.com","password":"password123"}'
+     -d '{"username":"testuser","email":"test@example.com","password":"password123"}'
+   
+   # Step 2: Complete registration (use userId from step 1 response)
+   curl -X POST http://localhost:3000/api/v1/auth/signup/step2/USER_ID_HERE \
+     -H "Content-Type: application/json" \
+     -d '{"fullName":"Test User","phoneNumber":"1234567890","college":"Test University","address":"123 Test Street"}'
    
    # Test signin
-   curl -X POST http://localhost:3001/api/v1/auth/signin \
+   curl -X POST http://localhost:3000/api/v1/auth/signin \
      -H "Content-Type: application/json" \
-     -d '{"email":"test@example.com","password":"password123"}'
+     -d '{"identifier":"testuser","password":"password123"}'
    ```
 
 ## API Endpoints
 
-### Authentication
-- `POST /api/v1/auth/signup` - Create new user account
-- `POST /api/v1/auth/signin` - Authenticate and get JWT token
+### Authentication (Two-Step Registration)
+- `POST /api/v1/auth/signup/step1` - Create new user account (basic info)
+- `POST /api/v1/auth/signup/step2/:userId` - Complete registration (additional info)
+- `POST /api/v1/auth/signin` - Authenticate with username/email and get JWT token
+- `POST /api/v1/auth/verify-token` - Verify JWT token validity
+- `GET /api/v1/auth/me` - Get current user profile
+
+### Password Reset
+- `POST /api/v1/auth/forgot-password` - Request password reset code
+- `POST /api/v1/auth/reset-password` - Reset password using OTP code
 
 ### Health & Monitoring
 - `GET /api/v1/health` - Detailed system health (CPU, memory, database)
 - `GET /api/v1/health/simple` - Simple health check
 
-### Users (Development only)
-- `POST /api/v1/users` - Create user (for testing)
-- `GET /api/v1/users` - List users (returns empty array)
+### Users (Profile Management)
+- `GET /api/v1/users/find` - Find user by username or email
+- `GET /api/v1/users/:id` - Get user profile by ID
+- `PUT /api/v1/users/:id` - Update user profile (authenticated users only)
+- `DELETE /api/v1/users/:id` - Soft delete user account (authenticated users only)
 
 ## Database Schema
 
-The application automatically creates tables on startup (via TypeORM synchronize). The main table is:
+The application automatically creates tables on startup (via TypeORM synchronize). The main tables are:
 
 - **users** table with columns:
   - `id` (UUID, primary key)
+  - `username` (varchar, unique, 3-50 characters)
   - `email` (varchar, unique)
   - `password_hash` (varchar)
+  - `step_one_complete` (boolean, default: false)
+  - `full_name` (varchar, optional)
+  - `phone_number` (varchar, optional)
+  - `college` (varchar, optional)
+  - `address` (text, optional)
+  - `step_two_complete` (boolean, default: false)
+  - `is_verified` (boolean, default: false)
+  - `is_active` (boolean, default: true)
+  - `deleted_at` (timestamp, nullable for soft delete)
+  - `password_reset_count` (integer, default: 0)
+  - `last_password_reset` (timestamp, nullable)
   - `created_at` (timestamp)
   - `updated_at` (timestamp)
 
@@ -165,12 +193,13 @@ In development mode, all SQL queries are logged to the console for debugging.
 - Verify user access: `psql postgresql://vaidityatanwar@localhost:5432/auth`
 
 ### Port Conflicts
-- Change `PORT=3001` in `.env` if port 3001 is busy
+- Change `PORT=3000` in `.env` if port 3000 is busy
 - Ensure PostgreSQL is on port 5432: `lsof -i :5432`
 
 ### Authentication Issues
 - Local PostgreSQL typically uses "trust" auth for local connections
 - If you need a password, update `DB_PASSWORD` in `.env`
+- Ensure your username in `.env` matches your system username
 
 ### TypeScript Errors
 - Run `npm run build` to check for compilation errors
