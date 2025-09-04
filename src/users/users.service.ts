@@ -140,7 +140,11 @@ export class UsersService {
       stepTwoComplete: true,
       isVerified: true,
     });
-    return (await this.findById(id)) as User;
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
   }
 
   // Get user profile (safe data without sensitive info)
