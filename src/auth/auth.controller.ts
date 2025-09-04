@@ -29,7 +29,10 @@ export class AuthController {
 
   @Post('signup/step2/:userId')
   @Version('1')
-  stepTwoSignup(@Param('userId') userId: string, @Body() dto: StepTwoSignupDto) {
+  stepTwoSignup(
+    @Param('userId') userId: string,
+    @Body() dto: StepTwoSignupDto,
+  ) {
     return this.authService.stepTwoSignup(userId, dto);
   }
 

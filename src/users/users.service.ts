@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { User } from './user.entity';
@@ -12,20 +16,20 @@ export class UsersService {
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
-    return await this.repo.findOne({ 
-      where: { 
+    return await this.repo.findOne({
+      where: {
         email: email.toLowerCase(),
         deletedAt: IsNull(),
-      } 
+      },
     });
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    return await this.repo.findOne({ 
-      where: { 
+    return await this.repo.findOne({
+      where: {
         username: username.toLowerCase(),
         deletedAt: IsNull(),
-      } 
+      },
     });
   }
 
@@ -40,11 +44,11 @@ export class UsersService {
   }
 
   async findById(id: string): Promise<User | null> {
-    return await this.repo.findOne({ 
-      where: { 
+    return await this.repo.findOne({
+      where: {
         id,
         deletedAt: IsNull(),
-      } 
+      },
     });
   }
 
@@ -68,7 +72,7 @@ export class UsersService {
     }
 
     await this.repo.update(id, updateData);
-    return await this.findById(id) as User;
+    return (await this.findById(id)) as User;
   }
 
   async softDelete(id: string): Promise<boolean> {
@@ -103,7 +107,7 @@ export class UsersService {
       stepTwoComplete: true,
       isVerified: true,
     });
-    return await this.findById(id) as User;
+    return (await this.findById(id)) as User;
   }
 
   // Get user profile (safe data without sensitive info)
