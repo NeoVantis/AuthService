@@ -11,7 +11,11 @@ import { UsersService } from '../users/users.service';
 import { TempOtpService } from './temp-otp.service';
 import { StepOneSignupDto } from './dto/step-one-signup.dto';
 import { StepTwoSignupDto } from './dto/step-two-signup.dto';
-import { SigninDto, ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
+import {
+  SigninDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto/password-reset.dto';
 import { User } from '../users/user.entity';
 
 @Injectable()
@@ -30,14 +34,18 @@ export class AuthService {
     });
   }
 
-  async stepOneSignup(dto: StepOneSignupDto): Promise<{ userId: string; message: string }> {
+  async stepOneSignup(
+    dto: StepOneSignupDto,
+  ): Promise<{ userId: string; message: string }> {
     // Check if email or username already exists
     const existingEmail = await this.usersService.findByEmail(dto.email);
     if (existingEmail) {
       throw new ConflictException('Email already in use');
     }
 
-    const existingUsername = await this.usersService.findByUsername(dto.username);
+    const existingUsername = await this.usersService.findByUsername(
+      dto.username,
+    );
     if (existingUsername) {
       throw new ConflictException('Username already taken');
     }
@@ -53,7 +61,8 @@ export class AuthService {
 
     return {
       userId: user.id,
-      message: 'Step 1 completed. Please complete step 2 to finish registration.',
+      message:
+        'Step 1 completed. Please complete step 2 to finish registration.',
     };
   }
 
@@ -87,7 +96,9 @@ export class AuthService {
     return { access_token, user: userProfile as Partial<User> };
   }
 
-  async signin(dto: SigninDto): Promise<{ access_token: string; user: Partial<User> }> {
+  async signin(
+    dto: SigninDto,
+  ): Promise<{ access_token: string; user: Partial<User> }> {
     const user = await this.usersService.findByEmailOrUsername(dto.identifier);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -114,7 +125,9 @@ export class AuthService {
     return { access_token, user: userProfile as Partial<User> };
   }
 
-  async verifyToken(token: string): Promise<{ valid: boolean; user?: Partial<User> }> {
+  async verifyToken(
+    token: string,
+  ): Promise<{ valid: boolean; user?: Partial<User> }> {
     try {
       const payload = await this.jwtService.verifyAsync(token);
       const user = await this.usersService.findById(payload.sub);
@@ -139,7 +152,9 @@ export class AuthService {
     }
   }
 
-  async forgotPassword(dto: ForgotPasswordDto): Promise<{ tempCode: string; message: string }> {
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+  ): Promise<{ tempCode: string; message: string }> {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user) {
       // Don't reveal if email exists or not
@@ -152,7 +167,9 @@ export class AuthService {
     const { uniqueId, code } = this.tempOtpService.generateOtp(dto.email);
 
     // In real implementation, this would be sent via email
-    console.log(`🔐 Password reset code for ${dto.email}: ${code} (Use tempCode: ${uniqueId})`);
+    console.log(
+      `🔐 Password reset code for ${dto.email}: ${code} (Use tempCode: ${uniqueId})`,
+    );
 
     return {
       tempCode: uniqueId, // In real app, this wouldn't be returned
@@ -172,7 +189,10 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    const isValidOtp = this.tempOtpService.verifyOtp(dto.tempCode, tempRecord.code);
+    const isValidOtp = this.tempOtpService.verifyOtp(
+      dto.tempCode,
+      tempRecord.code,
+    );
     if (!isValidOtp) {
       throw new BadRequestException('Invalid or expired reset code');
     }
