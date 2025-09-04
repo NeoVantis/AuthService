@@ -2,9 +2,10 @@
 
 ## Prerequisites
 
-1. **Node.js** (v18 or higher)
+1. **Node.js** (v20 or higher)
 2. **PostgreSQL** running locally
-3. **npm** or **yarn**
+3. **NeoVantis Notification Service** running locally (default: http://localhost:4321)
+4. **npm** or **yarn**
 
 ## Database Setup
 
@@ -86,27 +87,29 @@ psql postgresql://yourusername@localhost:5432/auth
    npm start
    ```
 
+   Note: The AuthService will refuse to start if it cannot reach the Notification Service. Ensure it is healthy at `${NOTIFICATION_SERVICE_URL:-http://localhost:4321}/api/v1/health`.
+
 4. **Verify everything works**:
    ```bash
    # Test health endpoint (detailed)
-   curl http://localhost:3000/api/v1/health
+   curl http://localhost:${PORT:-3000}/api/v1/health
    
    # Test simple health
-   curl http://localhost:3000/api/v1/health/simple
+   curl http://localhost:${PORT:-3000}/api/v1/health/simple
    
    # Test two-step registration
    # Step 1: Create account
-   curl -X POST http://localhost:3000/api/v1/auth/signup/step1 \
+   curl -X POST http://localhost:${PORT:-3000}/api/v1/auth/signup/step1 \
      -H "Content-Type: application/json" \
      -d '{"username":"testuser","email":"test@example.com","password":"password123"}'
    
    # Step 2: Complete registration (use userId from step 1 response)
-   curl -X POST http://localhost:3000/api/v1/auth/signup/step2/USER_ID_HERE \
+   curl -X POST http://localhost:${PORT:-3000}/api/v1/auth/signup/step2/USER_ID_HERE \
      -H "Content-Type: application/json" \
      -d '{"fullName":"Test User","phoneNumber":"1234567890","college":"Test University","address":"123 Test Street"}'
    
    # Test signin
-   curl -X POST http://localhost:3000/api/v1/auth/signin \
+   curl -X POST http://localhost:${PORT:-3000}/api/v1/auth/signin \
      -H "Content-Type: application/json" \
      -d '{"identifier":"testuser","password":"password123"}'
    ```
@@ -120,9 +123,14 @@ psql postgresql://yourusername@localhost:5432/auth
 - `POST /api/v1/auth/verify-token` - Verify JWT token validity
 - `GET /api/v1/auth/me` - Get current user profile
 
+### Email Verification
+- `POST /api/v1/auth/request-email-verification` - Request verification OTP
+- `POST /api/v1/auth/verify-email` - Verify email with OTP
+- `POST /api/v1/auth/resend-email-verification` - Resend OTP
+
 ### Password Reset
-- `POST /api/v1/auth/forgot-password` - Request password reset code
-- `POST /api/v1/auth/reset-password` - Reset password using OTP code
+- `POST /api/v1/auth/forgot-password` - Request password reset (`otpId` returned in dev)
+- `POST /api/v1/auth/reset-password` - Reset password using `otpId` + `code`
 
 ### Health & Monitoring
 - `GET /api/v1/health` - Detailed system health (CPU, memory, database)

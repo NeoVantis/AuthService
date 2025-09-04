@@ -8,7 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
-import { TempOtpService } from './temp-otp.service';
+import { OtpService } from './otp.service';
 import { StepOneSignupDto } from './dto/step-one-signup.dto';
 import { StepTwoSignupDto } from './dto/step-two-signup.dto';
 import {
@@ -16,6 +16,11 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
+import {
+  RequestEmailVerificationDto,
+  VerifyEmailDto,
+  ResendVerificationDto,
+} from './dto/email-verification.dto';
 import { User } from '../users/user.entity';
 
 @Injectable()
@@ -23,7 +28,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-    private readonly tempOtpService: TempOtpService,
+    private readonly otpService: OtpService,
   ) {}
 
   /**
@@ -90,7 +95,12 @@ export class AuthService {
   async stepTwoSignup(
     userId: string,
     dto: StepTwoSignupDto,
-  ): Promise<{ access_token: string; user: Partial<User> }> {
+  ): Promise<{ 
+    access_token: string; 
+    user: Partial<User>; 
+    verificationOtpId: string;
+    message: string;
+  }> {
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -111,10 +121,18 @@ export class AuthService {
       address: dto.address,
     });
 
+    // Send email verification
+    const { otpId } = await this.otpService.generateEmailVerificationOtp(user.email);
+
     const access_token = await this.signToken(updatedUser);
     const userProfile = await this.usersService.getUserProfile(userId);
 
-    return { access_token, user: userProfile as Partial<User> };
+    return { 
+      access_token, 
+      user: userProfile as Partial<User>,
+      verificationOtpId: otpId,
+      message: 'Registration completed! Please check your email to verify your account before signing in.',
+    };
   }
 
   /**
@@ -135,6 +153,12 @@ export class AuthService {
     if (!user.isSignupComplete) {
       throw new UnauthorizedException(
         'Please complete your registration before signing in',
+      );
+    }
+
+    if (!user.isVerified) {
+      throw new UnauthorizedException(
+        'Please verify your email address before signing in. Check your email for a verification link.',
       );
     }
 
@@ -193,6 +217,63 @@ export class AuthService {
   }
 
   /**
+   * Sends email verification OTP to user's email
+   * @param dto - Contains email address
+   * @returns Promise containing OTP ID and message
+   */
+  async requestEmailVerification(
+    dto: RequestEmailVerificationDto,
+  ): Promise<{ otpId: string; message: string }> {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    return await this.otpService.generateEmailVerificationOtp(dto.email);
+  }
+
+  /**
+   * Verifies email using OTP code
+   * @param dto - Contains OTP ID and verification code
+   * @returns Promise containing success message
+   */
+  async verifyEmail(dto: VerifyEmailDto): Promise<{ message: string }> {
+    const { email } = await this.otpService.verifyOtp(
+      dto.otpId,
+      dto.code,
+      'EMAIL_VERIFICATION',
+    );
+
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Mark user as verified
+    await this.usersService.updateUser(user.id, {
+      isVerified: true,
+      emailVerifiedAt: new Date(),
+    });
+
+    return { message: 'Email verified successfully' };
+  }
+
+  /**
+   * Resends email verification OTP
+   * @param dto - Contains OTP ID to resend
+   * @returns Promise containing success message
+   */
+  async resendEmailVerification(
+    dto: ResendVerificationDto,
+  ): Promise<{ message: string }> {
+    return await this.otpService.resendOtp(dto.otpId);
+  }
+
+  /**
    * Initiates password reset process by generating OTP code
    * @param dto - Contains email address for password reset
    * @returns Promise containing temporary code and success message
@@ -201,54 +282,36 @@ export class AuthService {
 
   async forgotPassword(
     dto: ForgotPasswordDto,
-  ): Promise<{ tempCode: string; message: string }> {
+  ): Promise<{ otpId: string; message: string }> {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user) {
-      // Don't reveal if email exists or not
+      // Don't reveal if email exists or not - return dummy response
       return {
-        tempCode: 'dummy_code',
+        otpId: 'dummy_otp_id',
         message: 'If the email exists, a reset code has been sent.',
       };
     }
 
-    const { uniqueId, code } = this.tempOtpService.generateOtp(dto.email);
-
-    // In real implementation, this would be sent via email
-    console.log(
-      `🔐 Password reset code for ${dto.email}: ${code} (Use tempCode: ${uniqueId})`,
-    );
-
-    return {
-      tempCode: uniqueId, // In real app, this wouldn't be returned
-      message: 'Reset code sent to your email.',
-    };
+    return await this.otpService.generatePasswordResetOtp(dto.email);
   }
 
   /**
    * Resets user password using OTP verification
-   * @param dto - Contains temporary code and new password
+   * @param dto - Contains OTP ID and new password
    * @returns Promise containing success message
    * @throws BadRequestException if OTP invalid or expired
    * @throws NotFoundException if user not found
    */
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
-    // For temporary solution, extract email from tempCode
-    const tempRecord = this.tempOtpService['otpStore'].get(dto.tempCode);
-    if (!tempRecord) {
-      throw new BadRequestException('Invalid or expired reset code');
-    }
+    const { email } = await this.otpService.verifyOtp(
+      dto.otpId,
+      dto.code,
+      'PASSWORD_RESET',
+    );
 
-    const user = await this.usersService.findByEmail(tempRecord.email);
+    const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new NotFoundException('User not found');
-    }
-
-    const isValidOtp = this.tempOtpService.verifyOtp(
-      dto.tempCode,
-      tempRecord.code,
-    );
-    if (!isValidOtp) {
-      throw new BadRequestException('Invalid or expired reset code');
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
@@ -263,6 +326,6 @@ export class AuthService {
    * @deprecated This method should be removed in production
    */
   async getActiveOtps() {
-    return this.tempOtpService.getActiveOtps();
+    return this.otpService.getActiveOtps();
   }
 }

@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { User } from './users/user.entity';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { User } from './users/user.entity';
     UsersModule,
     AuthModule,
     HealthModule,
+  NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

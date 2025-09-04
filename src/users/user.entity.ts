@@ -48,6 +48,9 @@ export class User {
   @Column({ name: 'is_verified', type: 'boolean', default: false })
   isVerified: boolean;
 
+  @Column({ name: 'email_verified_at', type: 'timestamp', nullable: true })
+  emailVerifiedAt?: Date;
+
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 

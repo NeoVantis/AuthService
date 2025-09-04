@@ -105,7 +105,11 @@ export class UsersService {
     }
 
     await this.repo.update(id, updateData);
-    return await this.findById(id);
+    const updatedUser = await this.findById(id);
+    if (!updatedUser) {
+      throw new NotFoundException('User not found after update');
+    }
+    return updatedUser;
   }
 
   async softDelete(id: string): Promise<boolean> {
@@ -138,7 +142,6 @@ export class UsersService {
     await this.repo.update(id, {
       ...stepTwoData,
       stepTwoComplete: true,
-      isVerified: true,
     });
     const user = await this.findById(id);
     if (!user) {
@@ -154,6 +157,7 @@ export class UsersService {
       return null;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, deletedAt, ...profile } = user;
     return profile;
   }

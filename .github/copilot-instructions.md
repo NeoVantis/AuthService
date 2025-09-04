@@ -6,6 +6,7 @@ Always follow these instructions first and fallback to search or bash commands o
 
 NeoVantis AuthService is a comprehensive NestJS-based authentication microservice with PostgreSQL database, JWT authentication, and advanced features including:
 - Two-step user registration with username support
+- Mandatory email verification via NeoVantis Notification Service
 - Password reset with OTP functionality  
 - Health monitoring with detailed system metrics
 - API versioning (v1)
@@ -18,6 +19,7 @@ NeoVantis AuthService is a comprehensive NestJS-based authentication microservic
 - **Node.js**: Requires Node.js 20+ (confirmed working with v20.19.4)
 - **PostgreSQL**: Requires PostgreSQL 16+ running locally
 - **Environment**: Copy `.env.example` to `.env` and configure database settings
+- **Notification Service**: Requires NeoVantis Notification Service (dev: http://localhost:4321). Set `NOTIFICATION_SERVICE_URL` in `.env`. The AuthService refuses to start if the Notification Service health check fails.
 
 ### Database Setup (Required Before Building/Running)
 ```bash
@@ -59,9 +61,10 @@ npm run lint  # Takes 5 seconds, Timeout: Set 2+ minutes
 # Start with hot reload - starts in 3 seconds after database connection
 npm run start:dev
 
-# Application will be available at http://localhost:3000
+# Application will be available at http://localhost:${PORT:-3000}
 # All API endpoints are under /api/v1/ prefix
 # Database tables are created automatically via TypeORM synchronize
+# Startup will abort if Notification Service is unreachable.
 ```
 
 #### Production Mode
@@ -102,7 +105,7 @@ curl http://localhost:3000/api/v1/health
 # Expected: JSON with status, memory, CPU, database metrics
 ```
 
-### 2. Complete Authentication Flow
+### 2. Complete Authentication Flow (with Email Verification)
 ```bash
 # Step 1: Initial signup
 curl -X POST http://localhost:3000/api/v1/auth/signup/step1 \
@@ -110,13 +113,22 @@ curl -X POST http://localhost:3000/api/v1/auth/signup/step1 \
   -d '{"username":"testuser","email":"test@example.com","password":"password123"}'
 # Expected: {"userId":"...","message":"Step 1 completed..."}
 
-# Step 2: Complete registration (use userId from step 1)
+# Step 2: Complete registration (use userId from step 1). This triggers an email verification OTP
 curl -X POST http://localhost:3000/api/v1/auth/signup/step2/USER_ID_HERE \
   -H "Content-Type: application/json" \
   -d '{"fullName":"Test User","phoneNumber":"1234567890","college":"Test University","address":"123 Test Street"}'
 # Expected: JWT token and complete user object
 
-# Step 3: Sign in with username
+# Step 3: Verify email (required)
+curl -X POST http://localhost:3000/api/v1/auth/request-email-verification \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com"}'
+
+curl -X POST http://localhost:3000/api/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"otpId":"OTP_ID","code":"123456"}'
+
+# Step 4: Sign in with username or email
 curl -X POST http://localhost:3000/api/v1/auth/signin \
   -H "Content-Type: application/json" \
   -d '{"identifier":"testuser","password":"password123"}'
@@ -128,18 +140,18 @@ curl -X GET http://localhost:3000/api/v1/auth/me \
 # Expected: User profile information
 ```
 
-### 3. Password Reset Flow
+### 3. Password Reset Flow (via Notification Service)
 ```bash
-# Request password reset
+# Request password reset (returns otpId in dev)
 curl -X POST http://localhost:3000/api/v1/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com"}'
 # Expected: Temporary code (in production, sent via email)
 
-# Reset password using temp code
+# Reset password using otpId + code
 curl -X POST http://localhost:3000/api/v1/auth/reset-password \
   -H "Content-Type: application/json" \
-  -d '{"tempCode":"TEMP_CODE_HERE","newPassword":"newpassword123"}'
+  -d '{"otpId":"OTP_ID","code":"123456","newPassword":"newpassword123"}'
 # Expected: Success message
 
 # Verify new password works
@@ -156,6 +168,7 @@ curl -X POST http://localhost:3000/api/v1/auth/signin \
 - **`src/users/`** - User management module (CRUD operations, profiles)  
 - **`src/health/`** - Health monitoring with system metrics
 - **`src/main.ts`** - Application entry point and configuration
+- **Notification Integration**: `src/notification/notification.service.ts` (client), `NOTIFICATION_SERVICE_URL` in env
 - **`src/app.module.ts`** - Main application module with database configuration
 
 ### Configuration Files
@@ -182,6 +195,11 @@ curl -X POST http://localhost:3000/api/v1/auth/signin \
 - **Problem**: "client password must be a string" error
 - **Solution**: Ensure `.env` has `DB_PASSWORD=testpass` (not empty string)
 - **Validation**: Test with `PGPASSWORD=testpass psql -h localhost -U $(whoami) -d auth -c "SELECT 1"`
+
+### Notification Service Not Running
+- **Problem**: AuthService refuses to start, logs indicate Notification Service health check failed
+- **Solution**: Start Notification Service locally (`http://localhost:4321`) or set `NOTIFICATION_SERVICE_URL` to a reachable instance
+- **Validation**: `curl http://localhost:4321/api/v1/health`
 
 ### Port Conflicts
 - **Problem**: "EADDRINUSE: address already in use :::3000"

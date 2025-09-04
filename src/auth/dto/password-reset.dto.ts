@@ -7,7 +7,10 @@ export class ForgotPasswordDto {
 
 export class ResetPasswordDto {
   @IsString()
-  tempCode: string; // Temporary solution instead of OTP service
+  otpId: string; // OTP ID from forgot password request
+
+  @IsString()
+  code: string; // 6-digit verification code
 
   @IsString()
   newPassword: string;

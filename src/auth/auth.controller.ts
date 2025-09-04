@@ -16,6 +16,11 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
+import {
+  RequestEmailVerificationDto,
+  VerifyEmailDto,
+  ResendVerificationDto,
+} from './dto/email-verification.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -63,6 +68,24 @@ export class AuthController {
     }
 
     return { user };
+  }
+
+  @Post('request-email-verification')
+  @Version('1')
+  requestEmailVerification(@Body() dto: RequestEmailVerificationDto) {
+    return this.authService.requestEmailVerification(dto);
+  }
+
+  @Post('verify-email')
+  @Version('1')
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto);
+  }
+
+  @Post('resend-email-verification')
+  @Version('1')
+  resendEmailVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendEmailVerification(dto);
   }
 
   @Post('forgot-password')

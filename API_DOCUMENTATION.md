@@ -7,7 +7,7 @@ This is a comprehensive authentication service built with NestJS, TypeORM, and P
 ## Base URL
 
 ```
-http://localhost:3000/api/v1
+http://localhost:${PORT:-3000}/api/v1
 ```
 
 ## Authentication
@@ -135,14 +135,56 @@ Complete user registration (Step 2 - Additional Information).
     "college": "Test University",
     "address": "123 Test Street",
     "stepTwoComplete": true,
-    "isVerified": true,
+    "isVerified": false,
     "isActive": true,
     "passwordResetCount": 0,
     "lastPasswordReset": null,
     "createdAt": "2025-09-04T05:59:45.498Z",
     "updatedAt": "2025-09-04T05:59:56.913Z"
-  }
+  },
+  "verificationOtpId": "otp_...",
+  "message": "Registration completed! Please check your email to verify your account before signing in."
 }
+#### Email Verification
+
+##### POST /auth/request-email-verification
+Send verification OTP to user's email.
+
+Request:
+```json
+{ "email": "test@example.com" }
+```
+
+Response:
+```json
+{ "otpId": "otp_...", "message": "Verification code sent to your email" }
+```
+
+##### POST /auth/verify-email
+Verify email using OTP.
+
+Request:
+```json
+{ "otpId": "otp_...", "code": "123456" }
+```
+
+Response:
+```json
+{ "message": "Email verified successfully" }
+```
+
+##### POST /auth/resend-email-verification
+Resend verification OTP by otpId.
+
+Request:
+```json
+{ "otpId": "otp_..." }
+```
+
+Response:
+```json
+{ "message": "New verification code sent to your email" }
+```
 ```
 
 #### POST /auth/signin
@@ -251,15 +293,13 @@ Request a password reset code.
 }
 ```
 
-**Response:**
+**Response (dev):**
 ```json
 {
-  "tempCode": "temp_1756965667391_o1mqv0vzx",
+  "otpId": "otp_1756965667391_o1mqv0vzx",
   "message": "Reset code sent to your email."
 }
 ```
-
-**Note:** In the temporary implementation, the tempCode is returned directly. In production, this would be sent via email and only the message would be returned.
 
 #### POST /auth/reset-password
 Reset password using the OTP code.
@@ -267,7 +307,8 @@ Reset password using the OTP code.
 **Request Body:**
 ```json
 {
-  "tempCode": "temp_1756965667391_o1mqv0vzx",
+  "otpId": "otp_1756965667391_o1mqv0vzx",
+  "code": "123456",
   "newPassword": "newpassword123"
 }
 ```
