@@ -26,6 +26,12 @@ export class AuthService {
     private readonly tempOtpService: TempOtpService,
   ) {}
 
+  /**
+   * Generates a JWT token for the user
+   * @private
+   * @param user - The user for whom to generate the token
+   * @returns Promise<string> - The JWT token
+   */
   private async signToken(user: User): Promise<string> {
     return await this.jwtService.signAsync({
       sub: user.id,
@@ -33,6 +39,13 @@ export class AuthService {
       username: user.username,
     });
   }
+
+  /**
+   * Step 1 of user registration - creates a user with basic information
+   * @param dto - Basic signup information (username, email, password)
+   * @returns Promise containing userId and success message
+   * @throws ConflictException if email or username already exists
+   */
 
   async stepOneSignup(
     dto: StepOneSignupDto,
@@ -66,6 +79,14 @@ export class AuthService {
     };
   }
 
+  /**
+   * Step 2 of user registration - completes user profile with additional information
+   * @param userId - The ID of the user from step 1
+   * @param dto - Additional profile information (fullName, phoneNumber, etc.)
+   * @returns Promise containing access token and complete user profile
+   * @throws NotFoundException if user not found
+   * @throws BadRequestException if step 1 not completed or step 2 already completed
+   */
   async stepTwoSignup(
     userId: string,
     dto: StepTwoSignupDto,
@@ -96,6 +117,13 @@ export class AuthService {
     return { access_token, user: userProfile as Partial<User> };
   }
 
+  /**
+   * Authenticates a user with username or email and password
+   * @param dto - Sign in credentials (identifier can be username or email, plus password)
+   * @returns Promise containing access token and user profile
+   * @throws UnauthorizedException if credentials invalid, registration incomplete, or account deactivated
+   */
+
   async signin(
     dto: SigninDto,
   ): Promise<{ access_token: string; user: Partial<User> }> {
@@ -125,6 +153,13 @@ export class AuthService {
     return { access_token, user: userProfile as Partial<User> };
   }
 
+
+  /**
+   * Verifies if a JWT token is valid and returns user information
+   * @param token - The JWT token to verify
+   * @returns Promise containing validation result and user info if valid
+   */
+
   async verifyToken(
     token: string,
   ): Promise<{ valid: boolean; user?: Partial<User> }> {
@@ -143,6 +178,11 @@ export class AuthService {
     }
   }
 
+  /**
+   * Extracts user information from a valid JWT token
+   * @param token - The JWT token to decode
+   * @returns Promise containing user profile or null if token invalid
+   */
   async getUserFromToken(token: string): Promise<Partial<User> | null> {
     try {
       const payload = await this.jwtService.verifyAsync(token);
@@ -151,6 +191,13 @@ export class AuthService {
       return null;
     }
   }
+
+  /**
+   * Initiates password reset process by generating OTP code
+   * @param dto - Contains email address for password reset
+   * @returns Promise containing temporary code and success message
+   * @note In production, OTP should be sent via email service
+   */
 
   async forgotPassword(
     dto: ForgotPasswordDto,
@@ -177,6 +224,13 @@ export class AuthService {
     };
   }
 
+  /**
+   * Resets user password using OTP verification
+   * @param dto - Contains temporary code and new password
+   * @returns Promise containing success message
+   * @throws BadRequestException if OTP invalid or expired
+   * @throws NotFoundException if user not found
+   */
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
     // For temporary solution, extract email from tempCode
     const tempRecord = this.tempOtpService['otpStore'].get(dto.tempCode);
@@ -203,7 +257,11 @@ export class AuthService {
     return { message: 'Password reset successfully' };
   }
 
-  // Debug endpoint - temporary solution
+  /**
+   * Debug endpoint - Returns active OTP codes (TEMPORARY - remove in production)
+   * @returns Promise containing list of active OTP codes
+   * @deprecated This method should be removed in production
+   */
   async getActiveOtps() {
     return this.tempOtpService.getActiveOtps();
   }

@@ -519,11 +519,11 @@ Required environment variables:
 ```env
 DB_HOST=localhost
 DB_PORT=5432
-DB_USERNAME=vaidityatanwar
+DB_USERNAME=yourusername
 DB_PASSWORD=
 DB_DATABASE=auth
 JWT_SECRET=dev_secret
-PORT=3001
+PORT=3000
 ```
 
 ## Testing Examples
@@ -531,17 +531,17 @@ PORT=3001
 ### Complete Registration Flow
 ```bash
 # Step 1: Create account
-curl -X POST http://localhost:3001/api/v1/auth/signup/step1 \
+curl -X POST http://localhost:3000/api/v1/auth/signup/step1 \
   -H "Content-Type: application/json" \
   -d '{"username": "testuser", "email": "test@example.com", "password": "password123"}'
 
 # Step 2: Complete registration (use userId from step 1)
-curl -X POST http://localhost:3001/api/v1/auth/signup/step2/USER_ID_HERE \
+curl -X POST http://localhost:3000/api/v1/auth/signup/step2/USER_ID_HERE \
   -H "Content-Type: application/json" \
   -d '{"fullName": "Test User", "phoneNumber": "1234567890", "college": "Test University", "address": "123 Test Street"}'
 
 # Sign in
-curl -X POST http://localhost:3001/api/v1/auth/signin \
+curl -X POST http://localhost:3000/api/v1/auth/signin \
   -H "Content-Type: application/json" \
   -d '{"identifier": "testuser", "password": "password123"}'
 ```
@@ -549,15 +549,15 @@ curl -X POST http://localhost:3001/api/v1/auth/signin \
 ### Password Reset Flow
 ```bash
 # Request reset code
-curl -X POST http://localhost:3001/api/v1/auth/forgot-password \
+curl -X POST http://localhost:3000/api/v1/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com"}'
 
 # Check active OTPs (development only)
-curl -X GET http://localhost:3001/api/v1/auth/dev/active-otps
+curl -X GET http://localhost:3000/api/v1/auth/dev/active-otps
 
 # Reset password
-curl -X POST http://localhost:3001/api/v1/auth/reset-password \
+curl -X POST http://localhost:3000/api/v1/auth/reset-password \
   -H "Content-Type: application/json" \
   -d '{"tempCode": "TEMP_CODE_HERE", "newPassword": "newpassword123"}'
 ```

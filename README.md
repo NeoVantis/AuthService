@@ -16,40 +16,67 @@ This is a NestJS-based authentication service with PostgreSQL and JWT, featuring
 4. **Test**:
    ```bash
    # Health check (detailed system metrics)
-   curl http://localhost:3001/api/v1/health
+   curl http://localhost:3000/api/v1/health
    
    # Simple health check
-   curl http://localhost:3001/api/v1/health/simple
+   curl http://localhost:3000/api/v1/health/simple
    
-   # Sign up
-   curl -X POST http://localhost:3001/api/v1/auth/signup \
+   # Two-step registration - Step 1
+   curl -X POST http://localhost:3000/api/v1/auth/signup/step1 \
      -H "Content-Type: application/json" \
-     -d '{"email":"test@example.com","password":"password123"}'
+     -d '{"username":"testuser","email":"test@example.com","password":"password123"}'
    
-   # Sign in
-   curl -X POST http://localhost:3001/api/v1/auth/signin \
+   # Two-step registration - Step 2 (use userId from step 1)
+   curl -X POST http://localhost:3000/api/v1/auth/signup/step2/USER_ID_HERE \
      -H "Content-Type: application/json" \
-     -d '{"email":"test@example.com","password":"password123"}'
+     -d '{"fullName":"Test User","phoneNumber":"1234567890","college":"Test University","address":"123 Test Street"}'
+   
+   # Sign in (with username or email)
+   curl -X POST http://localhost:3000/api/v1/auth/signin \
+     -H "Content-Type: application/json" \
+     -d '{"identifier":"testuser","password":"password123"}'
    ```
 
 ### API Endpoints (v1)
 
-#### Authentication
-- `POST /api/v1/auth/signup` - Create new user account
-- `POST /api/v1/auth/signin` - Authenticate and get JWT token
+#### Authentication (Two-Step Registration)
+- `POST /api/v1/auth/signup/step1` - Create new user account (basic info: username, email, password)
+- `POST /api/v1/auth/signup/step2/:userId` - Complete registration (additional info: full name, phone, etc.)
+- `POST /api/v1/auth/signin` - Authenticate with username or email and get JWT token
+- `POST /api/v1/auth/verify-token` - Verify JWT token validity
+- `GET /api/v1/auth/me` - Get current user profile (requires authentication)
+
+#### Password Reset
+- `POST /api/v1/auth/forgot-password` - Request password reset code
+- `POST /api/v1/auth/reset-password` - Reset password using OTP code
 
 #### Health & Monitoring
 - `GET /api/v1/health` - Detailed system health with CPU, memory, database metrics
 - `GET /api/v1/health/simple` - Simple health check (status + timestamp)
 
 #### Development Only
-- `POST /api/v1/users` - Create user (for testing)
-- `GET /api/v1/users` - List users (returns empty array)
+- `GET /api/v1/users/find` - Find user by username or email
+- `GET /api/v1/users/:id` - Get user profile by ID
+- `PUT /api/v1/users/:id` - Update user profile (authenticated users only)
+- `DELETE /api/v1/users/:id` - Soft delete user account (authenticated users only)
 
 ### Features
 
-#### 🔧 **API Versioning**
-All endpoints are versioned under `/api/v1/`. Future versions can be added as `/api/v2/`, etc.
+#### 🔧 **Two-Step Registration**
+Complete user onboarding in two phases:
+- **Step 1**: Basic account creation (username, email, password)
+- **Step 2**: Profile completion (full name, phone, college, address)
+- Users cannot sign in until both steps are completed
+
+#### 🔑 **Username & Email Authentication**
+- Unique usernames with validation (3-30 characters, alphanumeric + underscore)
+- Sign in using either username or email
+- Case-insensitive authentication
+
+#### 🔄 **Password Reset with OTP**
+- Email-based password reset requests
+- Temporary OTP codes with 10-minute expiration
+- Secure password reset tracking
 
 #### 📊 **Enhanced Health Monitoring**
 The health endpoint provides comprehensive system metrics:
@@ -58,6 +85,9 @@ The health endpoint provides comprehensive system metrics:
 - **Database**: Connection status and response times
 - **System**: Hostname, platform, architecture, uptime
 - **Application**: Version and runtime information
+
+#### 🔧 **API Versioning**
+All endpoints are versioned under `/api/v1/`. Future versions can be added as `/api/v2/`, etc.
 
 #### 🛡️ **Security & Validation**
 - JWT-based authentication with configurable expiration
@@ -74,12 +104,15 @@ The health endpoint provides comprehensive system metrics:
 ### Database
 - Uses PostgreSQL with TypeORM
 - Tables auto-created on startup (development mode)
-- Connection string: `postgresql://vaidityatanwar@localhost:5432/auth`
+- Connection string example: `postgresql://username@localhost:5432/auth`
 - UUID primary keys with timestamp tracking
+- Soft delete functionality for user accounts
 
 ### Documentation
 - [Local Development Guide](./docs/local-development.md) - Detailed setup instructions
 - [Deployment Guide](./docs/deployment.md) - Production deployment options
+- [Architecture Overview](./docs/architecture.md) - System design and two-step registration flow
+- [TypeScript Issues](./docs/typescript-issues.md) - Common development issues and solutions
 
 ### Health Monitoring Example
 
