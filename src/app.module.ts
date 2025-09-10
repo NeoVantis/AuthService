@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { User } from './users/user.entity';
 import { NotificationModule } from './notification/notification.module';
+import { AdminModule } from './admin/admin.module';
+import { Admin } from './admin/admin.entity';
 
 @Module({
   imports: [
@@ -20,7 +22,7 @@ import { NotificationModule } from './notification/notification.module';
         username: process.env.DB_USER,
         password: process.env.DB_PASSWORD || '',
         database: process.env.DB_NAME,
-        entities: [User],
+        entities: [User, Admin],
         synchronize: true, // dev only - creates tables automatically
         logging: process.env.NODE_ENV !== 'production',
       }),
@@ -28,7 +30,8 @@ import { NotificationModule } from './notification/notification.module';
     UsersModule,
     AuthModule,
     HealthModule,
-  NotificationModule,
+    NotificationModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

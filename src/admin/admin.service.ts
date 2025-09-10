@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -8,12 +8,47 @@ import { AdminLoginDto } from './dto/admin-login.dto';
 import { CreateAdminDto } from './dto/create-admin.dto';
 
 @Injectable()
-export class AdminService {
+export class AdminService implements OnModuleInit {
   constructor(
     @InjectRepository(Admin)
     private readonly adminRepo: Repository<Admin>,
     private readonly jwtService: JwtService,
   ) {}
+
+  /**
+   * Initialize the module - create super admin if no admins exist
+   */
+  async onModuleInit() {
+    await this.createSuperAdminIfNeeded();
+  }
+
+  /**
+   * Create super admin if no admins exist in the database
+   */
+  async createSuperAdminIfNeeded(): Promise<void> {
+    try {
+      const adminCount = await this.adminRepo.count();
+      
+      if (adminCount === 0) {
+        const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'md@neovantis.xyz';
+        const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'abcabcabc';
+        
+        const passwordHash = await bcrypt.hash(superAdminPassword, 10);
+        
+        const superAdmin = this.adminRepo.create({
+          username: superAdminEmail,
+          name: 'Super Administrator',
+          passwordHash,
+          role: 0, // 0 = super admin
+        });
+        
+        await this.adminRepo.save(superAdmin);
+        console.log(`✅ Super admin created with username: ${superAdminEmail}`);
+      }
+    } catch (error) {
+      console.error('❌ Error creating super admin:', error);
+    }
+  }
 
   /**
    * Find an admin by username
@@ -25,11 +60,27 @@ export class AdminService {
   }
 
   /**
-   * Create a new admin
+   * Create a new admin (only super admins can create other admins)
    */
-  async create(createAdminDto: CreateAdminDto): Promise<Admin> {
+  async create(
+    createAdminDto: CreateAdminDto,
+    requestingAdminId?: string,
+  ): Promise<Admin> {
     const { username, password, name, role } = createAdminDto;
-    
+
+    // If a requesting admin ID is provided, verify they are super admin
+    if (requestingAdminId) {
+      const requestingAdmin = await this.adminRepo.findOne({
+        where: { id: requestingAdminId },
+      });
+
+      if (!requestingAdmin || requestingAdmin.role !== 0) {
+        throw new ForbiddenException(
+          'Only super administrators can create new admins',
+        );
+      }
+    }
+
     // Check if username already exists
     const existingAdmin = await this.findByUsername(username);
     if (existingAdmin) {
@@ -38,7 +89,7 @@ export class AdminService {
 
     // Hash the password
     const passwordHash = await bcrypt.hash(password, 10);
-    
+
     // Create and save the admin
     const admin = this.adminRepo.create({
       username,
@@ -46,7 +97,7 @@ export class AdminService {
       passwordHash,
       role,
     });
-    
+
     return await this.adminRepo.save(admin);
   }
 
@@ -76,5 +127,45 @@ export class AdminService {
       access_token,
       userRole: admin.role,
     };
+  }
+
+  /**
+   * Get admin from JWT token
+   */
+  async getAdminFromToken(token: string): Promise<Admin | null> {
+    try {
+      const payload = await this.jwtService.verifyAsync(token);
+      return await this.adminRepo.findOne({
+        where: { id: payload.sub },
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Verify if admin is super admin
+   */
+  async verifySuperAdmin(adminId: string): Promise<boolean> {
+    const admin = await this.adminRepo.findOne({
+      where: { id: adminId },
+    });
+    return admin?.role === 0;
+  }
+
+  /**
+   * Get all admins (only super admins can access this)
+   */
+  async getAllAdmins(requestingAdminId: string): Promise<Admin[]> {
+    const isSuperAdmin = await this.verifySuperAdmin(requestingAdminId);
+    if (!isSuperAdmin) {
+      throw new ForbiddenException(
+        'Only super administrators can view all admins',
+      );
+    }
+
+    return await this.adminRepo.find({
+      select: ['id', 'username', 'name', 'role', 'createdAt', 'updatedAt'],
+    });
   }
 }
