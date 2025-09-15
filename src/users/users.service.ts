@@ -59,6 +59,20 @@ export class UsersService {
   }
 
   /**
+   * Finds a user by either email or username (case-insensitive) including soft-deleted users
+   * @param identifier - Email or username to search for
+   * @returns Promise containing user or null if not found
+   */
+  async findByEmailOrUsernameIncludingDeleted(
+    identifier: string,
+  ): Promise<User | null> {
+    const lowerIdentifier = identifier.toLowerCase();
+    return await this.repo.findOne({
+      where: [{ email: lowerIdentifier }, { username: lowerIdentifier }],
+    });
+  }
+
+  /**
    * Finds a user by ID
    * @param id - User ID to search for
    * @returns Promise containing user or null if not found
@@ -68,6 +82,19 @@ export class UsersService {
       where: {
         id,
         deletedAt: IsNull(),
+      },
+    });
+  }
+
+  /**
+   * Finds a user by ID including soft-deleted users
+   * @param id - User ID to search for
+   * @returns Promise containing user or null if not found
+   */
+  async findByIdIncludingDeleted(id: string): Promise<User | null> {
+    return await this.repo.findOne({
+      where: {
+        id,
       },
     });
   }
@@ -126,6 +153,27 @@ export class UsersService {
     return true;
   }
 
+  async clearDeletedAt(id: string): Promise<void> {
+    await this.repo
+      .createQueryBuilder()
+      .update(User)
+      .set({ deletedAt: () => 'NULL' })
+      .where('id = :id', { id })
+      .execute();
+  }
+
+  async reactivateUser(id: string): Promise<void> {
+    await this.repo
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        isActive: true,
+        deletedAt: () => 'NULL',
+      })
+      .where('id = :id', { id })
+      .execute();
+  }
+
   async incrementPasswordResetCount(id: string): Promise<void> {
     await this.repo.update(id, {
       passwordResetCount: () => 'password_reset_count + 1',
@@ -160,5 +208,124 @@ export class UsersService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, deletedAt, ...profile } = user;
     return profile;
+  }
+
+  /**
+   * Finds users with pagination, filtering, and search, along with total count
+   * @param options - Query options including where conditions, pagination, select fields, and order
+   * @returns Promise containing array of users and total count
+   */
+  async findAndCountWithSearch(options: {
+    where?: any;
+    skip?: number;
+    take?: number;
+    select?: (keyof User)[];
+    order?: any;
+  }): Promise<[User[], number]> {
+    const queryBuilder = this.repo.createQueryBuilder('user');
+    
+    // Always filter out soft-deleted users
+    queryBuilder.where('user.deletedAt IS NULL');
+
+    // Apply additional filters
+    if (options.where) {
+      if (options.where.$or) {
+        // Handle search conditions
+        const searchConditions = options.where.$or;
+        delete options.where.$or;
+        
+        // Add non-search filters first
+        Object.keys(options.where).forEach(key => {
+          queryBuilder.andWhere(`user.${key} = :${key}`, { [key]: options.where[key] });
+        });
+
+        // Add search conditions with OR
+        if (searchConditions.length > 0) {
+          const searchQuery = searchConditions.map((condition: any, index: number) => {
+            const field = Object.keys(condition)[0];
+            const value = condition[field].$like;
+            queryBuilder.setParameter(`search${index}`, value);
+            return `LOWER(user.${field}) LIKE LOWER(:search${index})`;
+          }).join(' OR ');
+          
+          queryBuilder.andWhere(`(${searchQuery})`);
+        }
+      } else {
+        // Handle regular filters
+        Object.keys(options.where).forEach(key => {
+          queryBuilder.andWhere(`user.${key} = :${key}`, { [key]: options.where[key] });
+        });
+      }
+    }
+
+    // Apply select fields
+    if (options.select) {
+      const selectFields = options.select.map(field => `user.${field as string}`);
+      queryBuilder.select(selectFields);
+    }
+
+    // Apply ordering
+    if (options.order) {
+      Object.keys(options.order).forEach(field => {
+        queryBuilder.addOrderBy(`user.${field}`, options.order[field]);
+      });
+    }
+
+    // Apply pagination
+    if (options.skip !== undefined) {
+      queryBuilder.offset(options.skip);
+    }
+    if (options.take !== undefined) {
+      queryBuilder.limit(options.take);
+    }
+
+    return queryBuilder.getManyAndCount();
+  }
+
+  /**
+   * Finds users with pagination and filtering, along with total count
+   * @param options - Query options including where conditions, pagination, select fields, and order
+   * @returns Promise containing array of users and total count
+   */
+  async findAndCount(options: {
+    where?: any;
+    skip?: number;
+    take?: number;
+    select?: (keyof User)[];
+    order?: any;
+  }): Promise<[User[], number]> {
+    const queryOptions = {
+      ...options,
+      where: {
+        ...options.where,
+        deletedAt: IsNull(), // Always filter out soft-deleted users
+      },
+    };
+
+    return await this.repo.findAndCount(queryOptions);
+  }
+
+  /**
+   * Finds ALL users including deactivated ones (for admin use)
+   * @param options - Query options including where conditions, pagination, select fields, and order
+   * @returns Promise containing array of users and total count
+   */
+  async findAndCountIncludingDeactivated(options: {
+    where?: any;
+    skip?: number;
+    take?: number;
+    select?: (keyof User)[];
+    order?: any;
+  }): Promise<[User[], number]> {
+    // Don't filter out soft-deleted users for admin searches
+    const queryOptions = {
+      ...options,
+      where: {
+        ...options.where,
+        // No deletedAt filter - include all users
+      },
+    };
+
+    return await this.repo.findAndCount(queryOptions);
   }
 }

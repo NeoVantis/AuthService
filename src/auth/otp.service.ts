@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotificationService } from '../notification/notification.service';
@@ -18,11 +22,11 @@ interface OtpRecord {
 export class OtpService {
   private otpStore = new Map<string, OtpRecord>();
 
-  constructor(
-    private notificationService: NotificationService,
-  ) {}
+  constructor(private notificationService: NotificationService) {}
 
-  async generateEmailVerificationOtp(email: string): Promise<{ otpId: string; message: string }> {
+  async generateEmailVerificationOtp(
+    email: string,
+  ): Promise<{ otpId: string; message: string }> {
     const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
     const otpId = `otp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -64,11 +68,15 @@ export class OtpService {
       // If email fails, remove the OTP record
       this.otpStore.delete(otpId);
       console.error('Failed to send verification email:', error);
-      throw new BadRequestException('Failed to send verification email. Please try again.');
+      throw new BadRequestException(
+        'Failed to send verification email. Please try again.',
+      );
     }
   }
 
-  async generatePasswordResetOtp(email: string): Promise<{ otpId: string; message: string }> {
+  async generatePasswordResetOtp(
+    email: string,
+  ): Promise<{ otpId: string; message: string }> {
     const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
     const otpId = `otp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -110,11 +118,17 @@ export class OtpService {
       // If email fails, remove the OTP record
       this.otpStore.delete(otpId);
       console.error('Failed to send password reset email:', error);
-      throw new BadRequestException('Failed to send password reset email. Please try again.');
+      throw new BadRequestException(
+        'Failed to send password reset email. Please try again.',
+      );
     }
   }
 
-  async verifyOtp(otpId: string, code: string, type: 'EMAIL_VERIFICATION' | 'PASSWORD_RESET'): Promise<{ email: string; isValid: boolean }> {
+  async verifyOtp(
+    otpId: string,
+    code: string,
+    type: 'EMAIL_VERIFICATION' | 'PASSWORD_RESET',
+  ): Promise<{ email: string; isValid: boolean }> {
     const record = this.otpStore.get(otpId);
 
     if (!record) {
@@ -171,7 +185,8 @@ export class OtpService {
 
     // Check if too recent (prevent spam)
     const timeSinceCreated = Date.now() - record.createdAt.getTime();
-    if (timeSinceCreated < 60000) { // 1 minute
+    if (timeSinceCreated < 60000) {
+      // 1 minute
       throw new BadRequestException('Please wait before requesting a new code');
     }
 
@@ -179,24 +194,30 @@ export class OtpService {
     const newCode = Math.floor(100000 + Math.random() * 900000).toString();
     record.code = newCode;
     record.attempts = 0;
-    record.expiresAt = new Date(Date.now() + (record.type === 'EMAIL_VERIFICATION' ? 15 : 10) * 60 * 1000);
+    record.expiresAt = new Date(
+      Date.now() + (record.type === 'EMAIL_VERIFICATION' ? 15 : 10) * 60 * 1000,
+    );
     record.createdAt = new Date();
 
     this.otpStore.set(otpId, record);
 
     try {
-      const templateName = record.type === 'EMAIL_VERIFICATION' ? 'email-verification' : 'password-reset';
-      const templateData = record.type === 'EMAIL_VERIFICATION'
-        ? {
-            recipientName: record.email.split('@')[0],
-            verificationCode: newCode,
-            expirationTime: '15 minutes',
-          }
-        : {
-            recipientName: record.email.split('@')[0],
-            resetCode: newCode,
-            expirationTime: '10 minutes',
-          };
+      const templateName =
+        record.type === 'EMAIL_VERIFICATION'
+          ? 'email-verification'
+          : 'password-reset';
+      const templateData =
+        record.type === 'EMAIL_VERIFICATION'
+          ? {
+              recipientName: record.email.split('@')[0],
+              verificationCode: newCode,
+              expirationTime: '15 minutes',
+            }
+          : {
+              recipientName: record.email.split('@')[0],
+              resetCode: newCode,
+              expirationTime: '10 minutes',
+            };
 
       await this.notificationService.sendTemplateEmail({
         recipientEmail: record.email,
@@ -210,7 +231,9 @@ export class OtpService {
       };
     } catch (error) {
       console.error('Failed to resend verification code:', error);
-      throw new BadRequestException('Failed to send verification code. Please try again.');
+      throw new BadRequestException(
+        'Failed to send verification code. Please try again.',
+      );
     }
   }
 

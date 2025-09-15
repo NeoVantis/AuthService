@@ -4,6 +4,8 @@ import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { Admin } from './admin.entity';
 import { JwtModule } from '@nestjs/jwt';
+import { AuthModule } from '../auth/auth.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { JwtModule } from '@nestjs/jwt';
         signOptions: { expiresIn: '1h' },
       }),
     }),
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

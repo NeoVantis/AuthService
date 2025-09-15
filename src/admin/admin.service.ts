@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, ConflictException, ForbiddenException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  ForbiddenException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -28,20 +34,22 @@ export class AdminService implements OnModuleInit {
   async createSuperAdminIfNeeded(): Promise<void> {
     try {
       const adminCount = await this.adminRepo.count();
-      
+
       if (adminCount === 0) {
-        const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'md@neovantis.xyz';
-        const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'abcabcabc';
-        
+        const superAdminEmail =
+          process.env.SUPER_ADMIN_EMAIL || 'md@neovantis.xyz';
+        const superAdminPassword =
+          process.env.SUPER_ADMIN_PASSWORD || 'abcabcabc';
+
         const passwordHash = await bcrypt.hash(superAdminPassword, 10);
-        
+
         const superAdmin = this.adminRepo.create({
           username: superAdminEmail,
           name: 'Super Administrator',
           passwordHash,
           role: 0, // 0 = super admin
         });
-        
+
         await this.adminRepo.save(superAdmin);
         console.log(`✅ Super admin created with username: ${superAdminEmail}`);
       }
@@ -104,25 +112,31 @@ export class AdminService implements OnModuleInit {
   /**
    * Admin login
    */
-  async login(adminLoginDto: AdminLoginDto): Promise<{ access_token: string; userRole: number }> {
+  async login(
+    adminLoginDto: AdminLoginDto,
+  ): Promise<{ access_token: string; userRole: number }> {
     const { username, password } = adminLoginDto;
-    
+
     // Find admin by username
     const admin = await this.findByUsername(username);
     if (!admin) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    
+
     // Generate JWT token
-    const payload = { sub: admin.id, username: admin.username, role: admin.role };
+    const payload = {
+      sub: admin.id,
+      username: admin.username,
+      role: admin.role,
+    };
     const access_token = await this.jwtService.signAsync(payload);
-    
+
     return {
       access_token,
       userRole: admin.role,

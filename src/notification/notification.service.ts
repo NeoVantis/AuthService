@@ -26,24 +26,31 @@ export class NotificationService {
   private readonly baseUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>('NOTIFICATION_SERVICE_URL') || 'http://localhost:4321';
+    this.baseUrl =
+      this.configService.get<string>('NOTIFICATION_SERVICE_URL') ||
+      'http://localhost:4321';
   }
 
-  async sendTemplateEmail(request: SendTemplateEmailRequest): Promise<SendEmailResponse> {
+  async sendTemplateEmail(
+    request: SendTemplateEmailRequest,
+  ): Promise<SendEmailResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/notifications/send-template-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${this.baseUrl}/api/v1/notifications/send-template-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
         },
-        body: JSON.stringify(request),
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new HttpException(
           errorData.message || 'Failed to send email',
-          response.status
+          response.status,
         );
       }
 
@@ -52,7 +59,7 @@ export class NotificationService {
       console.error('Notification service error:', error);
       throw new HttpException(
         'Email service temporarily unavailable',
-        HttpStatus.SERVICE_UNAVAILABLE
+        HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
   }
@@ -65,19 +72,22 @@ export class NotificationService {
     priority?: 'low' | 'normal' | 'high';
   }): Promise<SendEmailResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/notifications/send-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${this.baseUrl}/api/v1/notifications/send-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
         },
-        body: JSON.stringify(data),
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new HttpException(
           errorData.message || 'Failed to send email',
-          response.status
+          response.status,
         );
       }
 
@@ -86,7 +96,7 @@ export class NotificationService {
       console.error('Notification service error:', error);
       throw new HttpException(
         'Email service temporarily unavailable',
-        HttpStatus.SERVICE_UNAVAILABLE
+        HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
   }
@@ -95,12 +105,12 @@ export class NotificationService {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(`${this.baseUrl}/api/v1/health/simple`, {
         method: 'GET',
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {

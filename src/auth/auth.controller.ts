@@ -106,4 +106,7 @@ export class AuthController {
   getActiveOtps() {
     return this.authService.getActiveOtps();
   }
+
+  // NOTE: User management endpoints moved to /admin/users for proper access control
+  // Regular users should not have access to manage other users
 }
