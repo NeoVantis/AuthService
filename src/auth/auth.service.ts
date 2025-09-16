@@ -95,9 +95,9 @@ export class AuthService {
   async stepTwoSignup(
     userId: string,
     dto: StepTwoSignupDto,
-  ): Promise<{ 
-    access_token: string; 
-    user: Partial<User>; 
+  ): Promise<{
+    access_token: string;
+    user: Partial<User>;
     verificationOtpId: string;
     message: string;
   }> {
@@ -122,16 +122,19 @@ export class AuthService {
     });
 
     // Send email verification
-    const { otpId } = await this.otpService.generateEmailVerificationOtp(user.email);
+    const { otpId } = await this.otpService.generateEmailVerificationOtp(
+      user.email,
+    );
 
     const access_token = await this.signToken(updatedUser);
     const userProfile = await this.usersService.getUserProfile(userId);
 
-    return { 
-      access_token, 
+    return {
+      access_token,
       user: userProfile as Partial<User>,
       verificationOtpId: otpId,
-      message: 'Registration completed! Please check your email to verify your account before signing in.',
+      message:
+        'Registration completed! Please check your email to verify your account before signing in.',
     };
   }
 
@@ -145,8 +148,20 @@ export class AuthService {
   async signin(
     dto: SigninDto,
   ): Promise<{ access_token: string; user: Partial<User> }> {
+    // First check with normal lookup (excludes soft-deleted users)
     const user = await this.usersService.findByEmailOrUsername(dto.identifier);
+    
+    // If not found, check if user was soft-deleted
     if (!user) {
+      const deletedUser =
+        await this.usersService.findByEmailOrUsernameIncludingDeleted(
+          dto.identifier,
+        );
+      if (deletedUser && !deletedUser.isActive) {
+        throw new UnauthorizedException(
+          'Account is deactivated. Contact support for reactivation.',
+        );
+      }
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -176,7 +191,6 @@ export class AuthService {
 
     return { access_token, user: userProfile as Partial<User> };
   }
-
 
   /**
    * Verifies if a JWT token is valid and returns user information
@@ -327,5 +341,257 @@ export class AuthService {
    */
   async getActiveOtps() {
     return this.otpService.getActiveOtps();
+  }
+
+  /**
+   * Retrieves all registered users with pagination, filtering, search, and sorting
+   * @param options - Pagination, filtering, search, and sorting options
+   * @returns Promise containing users list with pagination metadata
+   */
+  async getAllUsers(options: {
+    page: number;
+    limit: number;
+    verified?: boolean;
+    active?: boolean;
+    search?: string;
+    searchField?: 'username' | 'email' | 'fullName' | 'college' | 'all';
+    sortBy?:
+      | 'username'
+      | 'email'
+      | 'fullName'
+      | 'createdAt'
+      | 'isVerified'
+      | 'isActive';
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{
+    users: Partial<User>[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
+    const {
+      page,
+      limit,
+      verified,
+      active,
+      search,
+      searchField = 'all',
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+    } = options;
+
+    // Validate pagination parameters
+    const validatedPage = Math.max(1, page);
+    const validatedLimit = Math.min(Math.max(1, limit), 100); // Max 100 users per page
+    const skip = (validatedPage - 1) * validatedLimit;
+
+    // Build filter conditions
+    const where: Record<string, any> = {};
+    if (verified !== undefined) where.isVerified = verified;
+    if (active !== undefined) where.isActive = active;
+
+    // Build order condition
+    const order: Record<string, 'ASC' | 'DESC'> = {};
+    order[sortBy] = sortOrder;
+
+    // Build search conditions
+    if (search && search.trim()) {
+      const searchTerm = search.trim().toLowerCase();
+      // Use the admin method that includes deactivated users
+      const baseResults =
+        await this.usersService.findAndCountIncludingDeactivated({
+          where,
+          skip,
+          take: validatedLimit,
+          select: [
+            'id',
+            'username',
+            'email',
+            'fullName',
+            'phoneNumber',
+            'college',
+            'address',
+            'isVerified',
+            'isActive',
+            'stepOneComplete',
+            'stepTwoComplete',
+            'createdAt',
+            'deletedAt',
+          ],
+          order,
+        });
+
+      let filteredUsers = baseResults[0];
+
+      // Apply search filter
+      if (searchField === 'all') {
+        filteredUsers = baseResults[0].filter(
+          (user) =>
+            user.username?.toLowerCase().includes(searchTerm) ||
+            user.email?.toLowerCase().includes(searchTerm) ||
+            user.fullName?.toLowerCase().includes(searchTerm) ||
+            user.college?.toLowerCase().includes(searchTerm),
+        );
+      } else {
+        filteredUsers = baseResults[0].filter((user) => {
+          const fieldValue = (user as any)[searchField];
+          return fieldValue?.toLowerCase().includes(searchTerm);
+        });
+      }
+
+      return {
+        users: filteredUsers.map((user) => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          college: user.college,
+          address: user.address,
+          isVerified: user.isVerified,
+          isActive: user.isActive,
+          stepOneComplete: user.stepOneComplete,
+          stepTwoComplete: user.stepTwoComplete,
+          createdAt: user.createdAt,
+          deletedAt: user.deletedAt,
+        })),
+        pagination: {
+          page: validatedPage,
+          limit: validatedLimit,
+          total: filteredUsers.length,
+          totalPages: Math.ceil(filteredUsers.length / validatedLimit),
+        },
+      };
+    }
+
+    const [users, total] =
+      await this.usersService.findAndCountIncludingDeactivated({
+        where,
+        skip,
+        take: validatedLimit,
+        select: [
+          'id',
+          'username',
+          'email',
+          'fullName',
+          'phoneNumber',
+          'college',
+          'address',
+          'isVerified',
+          'isActive',
+          'stepOneComplete',
+          'stepTwoComplete',
+          'createdAt',
+          'deletedAt',
+        ],
+        order,
+      });
+
+    return {
+      users: users.map((user) => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        phoneNumber: user.phoneNumber,
+        college: user.college,
+        address: user.address,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        stepOneComplete: user.stepOneComplete,
+        stepTwoComplete: user.stepTwoComplete,
+        createdAt: user.createdAt,
+        deletedAt: user.deletedAt,
+      })),
+      pagination: {
+        page: validatedPage,
+        limit: validatedLimit,
+        total,
+        totalPages: Math.ceil(total / validatedLimit),
+      },
+    };
+  }
+
+  /**
+   * Soft deletes a user by setting isActive to false
+   * @param userId - ID of the user to disable
+   * @param adminId - ID of the admin performing the action
+   * @param reason - Optional reason for disabling the account
+   * @returns Promise containing success message and user info
+   */
+  async softDeleteUser(
+    userId: string,
+    adminId: string,
+    reason?: string,
+  ): Promise<{ message: string; user: Partial<User> }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.isActive) {
+      throw new BadRequestException('User account is already disabled');
+    }
+
+    // Perform soft delete using the existing softDelete method in usersService
+    await this.usersService.softDelete(userId);
+
+    // Log the action (in production, you might want to store this in an audit table)
+    console.log(
+      `User ${user.username} (${user.email}) soft deleted by admin ${adminId}. Reason: ${reason || 'Not specified'}`,
+    );
+
+    return {
+      message: 'User account has been successfully disabled',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        isActive: false,
+      },
+    };
+  }
+
+  /**
+   * Reactivates a soft-deleted user by setting isActive to true
+   * @param userId - ID of the user to reactivate
+   * @param adminId - ID of the admin performing the action
+   * @returns Promise containing success message and user info
+   */
+  async reactivateUser(
+    userId: string,
+    adminId: string,
+  ): Promise<{ message: string; user: Partial<User> }> {
+    // We need to find the user even if soft deleted, so let's check directly
+    const user = await this.usersService.findByIdIncludingDeleted(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isActive) {
+      throw new BadRequestException('User account is already active');
+    }
+
+    // Reactivate user
+    await this.usersService.reactivateUser(userId);
+
+    console.log(
+      `User ${user.username} (${user.email}) reactivated by admin ${adminId}`,
+    );
+
+    return {
+      message: 'User account has been successfully reactivated',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        isActive: true,
+      },
+    };
   }
 }

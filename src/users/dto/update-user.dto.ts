@@ -28,4 +28,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsDate()
   emailVerifiedAt?: Date;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
